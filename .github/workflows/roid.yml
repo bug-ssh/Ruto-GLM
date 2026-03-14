@@ -1,128 +1,66 @@
-name: Dev Branch Build & Artifact
+name: Build & Release APK
 
 on:
   push:
-    branches-ignore:
-      - 'main'
-      - 'weblate-dev'
-    paths:
-      - 'app/**'
-      - 'build.gradle.kts'
-      - 'settings.gradle.kts'
-      - 'gradle.properties'
-      - 'gradle/**'
-      - '.github/workflows/auto-preview-dev.yml'
+    tags:
+      - 'v*'          # 推送 tag（如 v1.0.1）时自动构建并发布到 GitHub Releases
+  workflow_dispatch:    # 允许在 GitHub 网页上手动触发
 
 jobs:
-  pre_job:
+  build:
+    name: Build Debug APK
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@v5
-        with:
-          # 核心参数：如果发现完全相同的 Commit 已经成功跑过，则跳过
-          skip_after_successful_duplicate: 'true'
-          # 可选：如果同一个 Commit 正在跑，是否取消旧的？
-          # 'never' = 不取消，两者都跑（适合 dev 合并场景）
-          # 'same_content' = 内容一样就取消旧的
-          concurrent_skipping: 'never'
-          # 可选：忽略某些路径的变更（因为你已经在 on.push.paths 里配置了，这里通常不需要再配）
-          do_not_skip: '[]'
-
-  build_and_upload_artifact:
-    needs: pre_job
-    # 只有当 should_skip 不为 true 时才运行
-    if: |
-      needs.pre_job.outputs.should_skip != 'true' &&
-      !contains(github.event.head_commit.message, '[skip dev]')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
 
     steps:
+      # ── 1. 检出代码 ────────────────────────────────────────────────
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
+
+      # ── 2. 设置 JDK 21 ────────────────────────────────────────────
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
         with:
-          fetch-depth: 0
+          java-version: '21'
+          distribution: 'temurin'
 
-      - name: Get commit short SHA
-        id: commit_sha
-        run: echo "SHORT_SHA=$(git rev-parse --short=7 HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Set up JDK 25
-        uses: actions/setup-java@v5
+      # ── 3. 缓存 Gradle 依赖 ────────────────────────────────────────
+      - name: Cache Gradle
+        uses: actions/cache@v4
         with:
-          distribution: 'zulu'
-          java-version: '25'
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
-        with:
-          # dev 分支允许写入缓存
-          cache-read-only: ${{ github.ref_name != 'dev' }}
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
-
+      # ── 4. 赋予 gradlew 执行权限 ───────────────────────────────────
       - name: Grant execute permission for gradlew
-        run: chmod +x ./gradlew
+        run: chmod +x gradlew
 
-      - name: Update versionName format
-        id: version
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION=$(./gradlew -q properties | grep '^BASE_VERSION:' | awk '{print $2}')
-          A=$(echo $VERSION | cut -d. -f1)
-          B=$(echo $VERSION | cut -d. -f2)
-          C=$(echo $VERSION | cut -d. -f3)
-          C_NEW=$((C + 1))
-          NEW_VERSION="${A}.${B}.${C_NEW}.${{ steps.commit_sha.outputs.SHORT_SHA }}"
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-          echo "Generated Version: $NEW_VERSION"
+      # ── 5. 修复 app/build.gradle.kts（项目中文件名有 typo）─────────
+      - name: Fix app/build.gradle.kts
+        run: cp app/build.grade.kts app/build.gradle.kts
 
-      - name: Decode and set up signing key
-        env:
-          SIGNING_KEY_STORE_BASE64: ${{ secrets.SIGNING_KEY_STORE_BASE64 }}
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: |
-          if [ -z "${SIGNING_STORE_PASSWORD:-}" ] || [ -z "${SIGNING_KEY_STORE_BASE64:-}" ] || [ -z "${SIGNING_KEY_PASSWORD:-}" ] || [ -z "${SIGNING_KEY_ALIAS:-}" ]; then
-            exit 0
-          fi
-          mkdir -p keystore
-          echo "${SIGNING_KEY_STORE_BASE64}" | base64 --decode > keystore/carlyu.jks
-          echo "storeFile=keystore/carlyu.jks" > keystore.properties
-          echo "keyAlias=${SIGNING_KEY_ALIAS}" >> keystore.properties
-          echo "keyPassword=${SIGNING_KEY_PASSWORD}" >> keystore.properties
-          echo "storePassword=${SIGNING_STORE_PASSWORD}" >> keystore.properties
+      # ── 6. 构建 Debug APK（无需 keystore，自动签名）──────────────
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
 
-      - name: Build Dev Release APK
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew assembleOnlineUnstableRelease assembleOfflineUnstableRelease -PVERSION_NAME="${{ env.NEW_VERSION }}"
-
-      # Upload the online variant unzipped APK
-      - name: Upload Online APK
-        uses: actions/upload-artifact@v7
+      # ── 7. 上传为 Artifact（每次构建都可在 Actions 页面下载）───────
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: dev-online-apk-${{ steps.commit_sha.outputs.SHORT_SHA }}
-          path: app/build/outputs/apk/onlineUnstable/release/*.apk
-          retention-days: 15
-          archive: false
+          name: ruto-debug-${{ github.sha }}
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7
 
-      # Upload the offline variant unzipped APK
-      - name: Upload Offline APK
-        uses: actions/upload-artifact@v7
+      # ── 8. 推送 tag 时，自动发布到 GitHub Releases ─────────────────
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
         with:
-          name: dev-offline-apk-${{ steps.commit_sha.outputs.SHORT_SHA }}
-          path: app/build/outputs/apk/offlineUnstable/release/*.apk
-          retention-days: 15
-          archive: false
+          files: app/build/outputs/apk/debug/*.apk
+          generate_release_notes: true
+          name: "Ruto ${{ github.ref_name }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
