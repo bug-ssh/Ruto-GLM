@@ -1,32 +1,35 @@
 package com.rosan.ruto.ui.compose
 
-import android.view.DisplayInfo
+import android.os.ServiceManager
+import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,19 +38,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.twotone.Forum
+import androidx.compose.material.icons.twotone.HourglassTop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -58,18 +59,16 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -77,19 +76,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.rosan.installer.ext.util.dumpToBytes
 import com.rosan.ruto.data.model.AiModel
 import com.rosan.ruto.data.model.ConversationModel
-import com.rosan.ruto.device.DeviceManager
+import com.rosan.ruto.device.repo.DeviceRepo
 import com.rosan.ruto.ui.Destinations
 import com.rosan.ruto.ui.viewmodel.ConversationListViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
+import rikka.shizuku.ShizukuBinderWrapper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,7 +104,7 @@ fun ConversationListScreen(
 ) {
     val conversations by viewModel.conversations.collectAsState(initial = emptyList())
     val aiModels by viewModel.aiModels.collectAsState(initial = emptyList())
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val isLoading by remember { mutableStateOf(false) }
 
     var selectedIds by remember { mutableStateOf(emptyList<Long>()) }
     val isInSelectionMode = selectedIds.isNotEmpty()
@@ -112,7 +116,6 @@ fun ConversationListScreen(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             AnimatedContent(
                 targetState = isInSelectionMode, transitionSpec = {
@@ -146,91 +149,69 @@ fun ConversationListScreen(
                         }
                     })
                 } else {
-                    LargeTopAppBar(
-                        title = {
-                            Column {
-                                Text(
-                                    "Conversations",
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    "History of your AI interactions",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.Normal
-                                )
-                            }
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = { navController.popBackStack() }) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back"
-                                )
-                            }
-                        },
-                        scrollBehavior = scrollBehavior,
-                        colors = TopAppBarDefaults.largeTopAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            scrolledContainerColor = MaterialTheme.colorScheme.surface
-                        )
-                    )
+                    TopAppBar(title = { Text("对话列表") }, navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back"
+                            )
+                        }
+                    })
                 }
             }
         }, floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    if (isInSelectionMode) {
-                        if (selectedIds.isEmpty()) return@FloatingActionButton
-                        viewModel.remove(selectedIds)
-                        selectedIds = emptyList()
-                    } else showDialog = true
-                },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                AnimatedContent(
-                    targetState = isInSelectionMode, transitionSpec = {
-                        if (targetState) {
-                            slideInVertically { height -> height } togetherWith slideOutVertically { height -> -height }
+                FloatingActionButton(
+                    onClick = {
+                        if (isInSelectionMode) {
+                            if (selectedIds.isEmpty()) return@FloatingActionButton
+                            viewModel.remove(selectedIds)
+                            selectedIds = emptyList()
+                        } else showDialog = true
+                    },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    AnimatedContent(
+                        targetState = isInSelectionMode, transitionSpec = {
+                            if (targetState) {
+                                slideInVertically { height -> height } togetherWith slideOutVertically { height -> -height }
+                            } else {
+                                slideInVertically { height -> -height } togetherWith slideOutVertically { height -> height }
+                            }
+                        }, label = "floatingActionButton"
+                    ) { selectionMode ->
+                        if (selectionMode) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete")
                         } else {
-                            slideInVertically { height -> -height } togetherWith slideOutVertically { height -> height }
+                            Icon(Icons.Default.Add, contentDescription = "Add")
                         }
-                    }, label = "floatingActionButton"
-                ) { selectionMode ->
-                    if (selectionMode) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete")
-                    } else {
-                        Icon(Icons.Default.Add, contentDescription = "Add")
                     }
                 }
             }
         }, contentWindowInsets = insets
     ) { padding ->
-        AnimatedContent(
-            targetState = conversations.isEmpty(),
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            transitionSpec = {
-                (fadeIn(animationSpec = tween(500)) + expandVertically()) togetherWith
-                        (fadeOut(animationSpec = tween(500)) + shrinkVertically())
-            },
-            label = "ContentAnimation"
-        ) { isEmpty ->
-            if (isEmpty) {
-                EmptyConversation()
+                .padding(padding)
+        ) {
+            if (conversations.isEmpty()) {
+                if (isLoading) {
+                    LoadingIndicator()
+                } else {
+                    EmptyConversation()
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(
-                        start = 24.dp,
-                        end = 24.dp,
-                        top = 8.dp,
-                        bottom = 80.dp
-                    )
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(16.dp)
                 ) {
                     items(conversations, key = { it.id }) { conversation ->
+                        // 增加 animateItem 使得增删列表时有位移动画
                         Box(modifier = Modifier.animateItem()) {
                             ConversationListItem(
                                 aiModels = aiModels,
@@ -259,28 +240,26 @@ fun ConversationListScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreateConversationDialog(
     aiModels: List<AiModel>,
     onDismiss: () -> Unit,
     onConfirm: (conversationModel: ConversationModel) -> Unit,
 ) {
-    var name by remember { mutableStateOf("New Conversation") }
+    var name by remember { mutableStateOf("新对话") }
     var aiId by remember { mutableStateOf<Long?>(null) }
 
     var isTaskConversation by remember { mutableStateOf(false) }
     var selectedDisplayId by remember { mutableStateOf<Int?>(null) }
 
-    val deviceManager = koinInject<DeviceManager>()
-    var displays by remember { mutableStateOf(emptyList<DisplayInfo>()) }
-    LaunchedEffect(Unit) {
-        displays = deviceManager.getDisplayManager().displays
-    }
+    val device = koinInject<DeviceRepo>()
+    val displayManager = device.displayManager
+    val displays = remember { displayManager.displays }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create New Conversation") },
+        title = { Text("新建对话") },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -290,11 +269,10 @@ private fun CreateConversationDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                Text("AI Model", style = MaterialTheme.typography.labelLarge)
+                Text("AI 模型", style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     aiModels.forEach { aiModel ->
                         FilterChip(
@@ -310,10 +288,7 @@ private fun CreateConversationDialog(
                     }
                 }
 
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -321,9 +296,9 @@ private fun CreateConversationDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Task Mode", style = MaterialTheme.typography.titleMedium)
+                        Text("任务模式", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Enable screen-specific automation",
+                            "启用指定屏幕自动化",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -339,22 +314,29 @@ private fun CreateConversationDialog(
 
                 AnimatedVisibility(visible = isTaskConversation) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Select Target Screen", style = MaterialTheme.typography.labelLarge)
+                        Text("选择目标屏幕", style = MaterialTheme.typography.labelLarge)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             displays.forEach { display ->
-                                FilterChip(
-                                    selected = selectedDisplayId == display.displayId,
-                                    onClick = { selectedDisplayId = display.displayId },
-                                    label = { Text("Display ${display.displayId} (${display.name})") },
-                                    leadingIcon = {
-                                        if (selectedDisplayId == display.displayId) {
-                                            Icon(
-                                                Icons.Default.Monitor,
-                                                null,
-                                                modifier = Modifier.size(16.dp)
-                                            )
+                                @Composable
+                                fun DisplayChip(displayId: Int, displayName: String) {
+                                    FilterChip(
+                                        selected = selectedDisplayId == displayId,
+                                        onClick = { selectedDisplayId = displayId },
+                                        label = { Text(displayName) },
+                                        leadingIcon = {
+                                            if (selectedDisplayId == displayId) {
+                                                Icon(
+                                                    Icons.Default.Monitor,
+                                                    null,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
                                         }
-                                    }
+                                    )
+                                }
+                                DisplayChip(
+                                    display.displayId,
+                                    "屏幕 ${display.displayId}（${display.name}）"
                                 )
                             }
                         }
@@ -374,13 +356,14 @@ private fun CreateConversationDialog(
                         onConfirm(model)
                     }
                 },
+                // 校验逻辑：必须选了 AI；如果是任务模式，必须选了屏幕
                 enabled = aiId != null && (!isTaskConversation || selectedDisplayId != null)
             ) {
-                Text("Confirm")
+                Text("确认")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text("取消") }
         }
     )
 }
@@ -397,9 +380,9 @@ fun ConversationListItem(
     val scale by animateFloatAsState(if (isSelected) 0.96f else 1f, label = "scale")
     val backgroundColor by animateColorAsState(
         targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.primaryContainer
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
         } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            MaterialTheme.colorScheme.surface
         }, label = "backgroundColor"
     )
 
@@ -409,100 +392,102 @@ fun ConversationListItem(
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-            }
-            .clip(RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
+            },
+        shape = MaterialTheme.shapes.medium,
+        border = if (isSelected) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        },
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 2.dp else 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 0.dp)
     ) {
-        Box(
+        ListItem(
             modifier = Modifier
-                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
                 .combinedClickable(
                     onClick = onClick, onLongClick = onLongClick
+                ),
+            headlineContent = {
+                val animatedColor by animateColorAsState(
+                    targetValue = if (isSelected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    label = "contentColor"
                 )
-        ) {
-            Row(
-                modifier = Modifier.padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
+                Text(
+                    conversation.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = animatedColor
+                )
+            }, supportingContent = {
+                val animatedColor by animateColorAsState(
+                    targetValue = if (isSelected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    label = "contentColor"
+                )
+                Text(
+                    "模型：${aiModels.find { it.id == conversation.aiId }?.name}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = animatedColor
+                )
+            }, leadingContent = {
                 Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape),
+                    modifier = Modifier.fillMaxHeight(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                    ) {}
-                    Icon(
-                        imageVector = Icons.TwoTone.Forum,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    Crossfade(
+                        targetState = isSelected,
+                        label = "iconFade"
+                    ) { selected ->
+                        Icon(
+                            imageVector = if (selected) Icons.Default.SelectAll else Icons.TwoTone.HourglassTop,
+                            contentDescription = null,
+                            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                        )
+                    }
                 }
+            })
+    }
+}
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        conversation.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "Model: ${aiModels.find { it.id == conversation.aiId }?.name ?: "Unknown"}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
-            }
-
-            androidx.compose.animation.AnimatedVisibility(
-                visible = isSelected,
-                enter = fadeIn() + scaleIn(),
-                exit = fadeOut() + scaleOut(),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CheckCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
+@Composable
+private fun LoadingIndicator() {
+    val infiniteTransition = rememberInfiniteTransition(label = "loading")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.5f,
+        animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+        label = "scale"
+    )
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Icon(
+            Icons.TwoTone.HourglassTop,
+            contentDescription = null,
+            modifier = Modifier.scale(scale),
+            tint = MaterialTheme.colorScheme.primary
+        )
     }
 }
 
 @Composable
 fun EmptyConversation() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    Box(
+        modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = Icons.TwoTone.Forum,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            "No conversations yet",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            "Start a new AI session to get started",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.TwoTone.Forum,
+                contentDescription = "暂无对话",
+                modifier = Modifier.size(80.dp),
+                tint = Color.Gray
+            )
+            Text(
+                text = "暂无对话，点击右下角新建吧！",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.Gray,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }

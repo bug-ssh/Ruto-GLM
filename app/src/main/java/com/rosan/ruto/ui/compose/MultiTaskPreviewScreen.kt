@@ -157,21 +157,21 @@ fun MultiTaskPreviewScreen(navController: NavController, displayIds: List<Int>) 
 
         FloatingActionMenu(
             subButtons = listOf(
-                Icons.AutoMirrored.Filled.ArrowBack to "Back",
-                Icons.Filled.Apps to "Select App",
-                (if (isDragMode) Icons.Filled.TouchApp else Icons.Filled.PanTool) to "Toggle Mode",
-                Icons.Filled.Close to "Close"
+                Icons.AutoMirrored.Filled.ArrowBack to "返回",
+                Icons.Filled.Apps to "选择应用",
+                (if (isDragMode) Icons.Filled.TouchApp else Icons.Filled.PanTool) to "切换模式",
+                Icons.Filled.Close to "关闭"
             ),
             onButtonClick = { action ->
                 when (action) {
-                    "Back" -> activeDisplayId?.let { viewModel.clickBack(it) }
-                    "Select App" -> if (activeDisplayId != null) showAppPickerDialog = true
-                    "Toggle Mode" -> isDragMode = !isDragMode
+                    "返回" -> activeDisplayId?.let { viewModel.clickBack(it) }
+                    "选择应用" -> if (activeDisplayId != null) showAppPickerDialog = true
+                    "切换模式" -> isDragMode = !isDragMode
                     "Close" -> navController.popBackStack()
                 }
             },
             onButtonLongClick = {},
-            isButtonEnabled = { action -> if (action == "Close" || action == "Toggle Mode") true else activeDisplayId != null },
+            isButtonEnabled = { action -> if (action == "关闭" || action == "切换模式") true else activeDisplayId != null },
             screenWidth = screenWidthPx,
             screenHeight = screenHeightPx
         )
