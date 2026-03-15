@@ -35,15 +35,21 @@ android {
     }
 
     signingConfigs {
-        val storeFile: File = file("$keystoreDir/${keystoreProps.getProperty("storeFile")}")
-        val storePassword: String = keystoreProps.getProperty("storePassword")
-        val keyAlias: String = keystoreProps.getProperty("keyAlias")
-        val keyPassword: String = keystoreProps.getProperty("keyPassword")
+        val storeFileVal: File = file("$keystoreDir/${keystoreProps.getProperty("storeFile") ?: "release.jks"}")
+        val storePasswordVal: String = keystoreProps.getProperty("storePassword") ?: ""
+        val keyAliasVal: String = keystoreProps.getProperty("keyAlias") ?: ""
+        val keyPasswordVal: String = keystoreProps.getProperty("keyPassword") ?: ""
         getByName("debug") {
-            this.storeFile = storeFile
-            this.storePassword = storePassword
-            this.keyAlias = keyAlias
-            this.keyPassword = keyPassword
+            this.storeFile = storeFileVal
+            this.storePassword = storePasswordVal
+            this.keyAlias = keyAliasVal
+            this.keyPassword = keyPasswordVal
+        }
+        create("release") {
+            this.storeFile = storeFileVal
+            this.storePassword = storePasswordVal
+            this.keyAlias = keyAliasVal
+            this.keyPassword = keyPasswordVal
         }
     }
 
@@ -51,6 +57,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
 
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
