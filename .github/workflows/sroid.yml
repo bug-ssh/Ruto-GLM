@@ -1,6 +1,6 @@
-名字:Release APK
+名字: Build & Release APK
 
-于:
+"on":
   push:
     标签:
       - 'v*'
