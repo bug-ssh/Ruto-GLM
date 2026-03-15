@@ -3,11 +3,13 @@ package com.rosan.ruto.data.model
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.rosan.ruto.data.model.conversation.ConversationStatus
 
 @Entity(
     tableName = "conversations",
+    indices = [Index(value = ["ai_id"])],
     foreignKeys = [
         ForeignKey(
             entity = AiModel::class,
