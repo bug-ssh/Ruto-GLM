@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,8 +41,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.rosan.ruto.ui.viewmodel.DisplayItem
+
+/** 根据 displayId / isMyDisplay / name 给出友好的显示名称 */
+private fun DisplayItem.friendlyName(): String = when {
+    displayId == 0 -> "内置主屏幕"
+    isMyDisplay -> if (!name.isNullOrBlank()) name else "虚拟屏幕 #$displayId"
+    !name.isNullOrBlank() -> name
+    else -> "屏幕 #$displayId"
+}
+
+/** 类型标签文字 */
+private fun DisplayItem.typeLabel(): String = when {
+    displayId == 0 -> "内置"
+    isMyDisplay -> "虚拟"
+    else -> "外接"
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -55,20 +73,17 @@ fun ScreenListItem(
 ) {
     val scale by animateFloatAsState(if (isSelected) 0.96f else 1f, label = "scale")
     val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected) {
+        targetValue = if (isSelected)
             MaterialTheme.colorScheme.primaryContainer
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        }, label = "backgroundColor"
+        else
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        label = "backgroundColor"
     )
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
@@ -77,28 +92,25 @@ fun ScreenListItem(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = onLongClick
-                )
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // ── 顶部：图标 + 名称 + 类型标签 ──────────────────────────
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    // 圆形图标背景
                     Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape),
+                        modifier = Modifier.size(44.dp).clip(CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                         ) {}
                         Icon(
                             imageVector = Icons.Default.Monitor,
@@ -108,22 +120,50 @@ fun ScreenListItem(
                         )
                     }
 
+                    // 名称 + 分辨率
                     Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = display.friendlyName(),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            // 类型标签小胶囊
+                            Text(
+                                text = display.typeLabel(),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier
+                                    .background(
+                                        color = when (display.typeLabel()) {
+                                            "内置" -> MaterialTheme.colorScheme.primary
+                                            "虚拟" -> MaterialTheme.colorScheme.tertiary
+                                            else  -> MaterialTheme.colorScheme.secondary
+                                        },
+                                        shape = RoundedCornerShape(50)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
                         Text(
-                            "#${display.displayId} ${display.name}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "分辨率：${display.logicalWidth}x${display.logicalHeight}（${display.logicalDensityDpi} DPI）",
+                            text = "${display.logicalWidth} × ${display.logicalHeight}  ${display.logicalDensityDpi} DPI",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
+                // ── 底部操作按钮 ───────────────────────────────────────────
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -139,7 +179,6 @@ fun ScreenListItem(
                             Icon(Icons.Default.Delete, contentDescription = "删除")
                         }
                     }
-
                     IconButton(
                         onClick = { onPreview(display.displayId) },
                         colors = IconButtonDefaults.iconButtonColors(
@@ -151,13 +190,12 @@ fun ScreenListItem(
                 }
             }
 
+            // 选中勾
             androidx.compose.animation.AnimatedVisibility(
                 visible = isSelected,
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut(),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp)
+                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,

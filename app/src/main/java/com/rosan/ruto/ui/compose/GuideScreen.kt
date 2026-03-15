@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
+import com.rosan.installer.ext.util.process.ProcessUtil
 import com.rosan.ruto.device.DeviceManager
 import com.rosan.ruto.service.KeepAliveService
 import com.rosan.ruto.ui.Destinations
@@ -246,8 +247,8 @@ fun GuideScreen(navController: NavController, insets: PaddingValues) {
                                                 )
                                                 Text(
                                                     text = when (provider) {
-                                                        PermissionProvider.SHIZUKU -> "Requires Shizuku app"
-                                                        PermissionProvider.SHIZUKU_TERMINAL -> "Shizuku with terminal fallback"
+                                                        PermissionProvider.SHIZUKU -> "需要 Shizuku 应用"
+                                                        PermissionProvider.SHIZUKU_TERMINAL -> "Shizuku 优先，终端兜底"
                                                         PermissionProvider.ROOT -> "传统 Root 授权"
                                                         PermissionProvider.TERMINAL -> "手动 Shell 执行"
                                                     },
@@ -270,7 +271,7 @@ fun GuideScreen(navController: NavController, insets: PaddingValues) {
                                     OutlinedTextField(
                                         value = shell,
                                         onValueChange = { shell = it; isShellError = false },
-                                        label = { Text("Shell Path") },
+                                        label = { Text("Shell 路径") },
                                         isError = isShellError,
                                         modifier = Modifier.fillMaxWidth(),
                                         shape = RoundedCornerShape(12.dp),
@@ -292,7 +293,26 @@ fun GuideScreen(navController: NavController, insets: PaddingValues) {
                                             selectedProvider!!,
                                             if (selectedProvider == PermissionProvider.TERMINAL) shell else null
                                         )
-                                        uiState = GuideUiState.Loading
+                                        // Shizuku 系列：直接弹出 Shizuku 授权弹窗
+                                        if (selectedProvider == PermissionProvider.SHIZUKU ||
+                                            selectedProvider == PermissionProvider.SHIZUKU_TERMINAL
+                                        ) {
+                                            scope.launch {
+                                                uiState = GuideUiState.Loading
+                                                runCatching {
+                                                    ProcessUtil.requestShizukuPermissions()
+                                                }.onSuccess {
+                                                    uiState = GuideUiState.Loading
+                                                }.onFailure { throwable ->
+                                                    uiState = GuideUiState.PermissionNeeded(
+                                                        selectedProvider!!,
+                                                        throwable.message ?: "Shizuku 授权被拒绝，请在 Shizuku 应用中确认。"
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            uiState = GuideUiState.Loading
+                                        }
                                     }
                                 },
                                 enabled = selectedProvider != null
@@ -335,7 +355,25 @@ fun GuideScreen(navController: NavController, insets: PaddingValues) {
                                     .height(56.dp),
                                 shape = RoundedCornerShape(16.dp),
                                 onClick = {
-                                    uiState = GuideUiState.Loading
+                                    when (state.provider) {
+                                        PermissionProvider.SHIZUKU,
+                                        PermissionProvider.SHIZUKU_TERMINAL -> {
+                                            // 直接向 Shizuku 弹出授权弹窗，成功后再进 Loading 校验
+                                            scope.launch {
+                                                runCatching {
+                                                    ProcessUtil.requestShizukuPermissions()
+                                                }.onSuccess {
+                                                    uiState = GuideUiState.Loading
+                                                }.onFailure { throwable ->
+                                                    uiState = GuideUiState.PermissionNeeded(
+                                                        state.provider,
+                                                        throwable.message ?: "Shizuku 授权被拒绝，请在 Shizuku 应用中确认。"
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        else -> uiState = GuideUiState.Loading
+                                    }
                                 }
                             ) {
                                 Text(
@@ -376,7 +414,14 @@ fun GuideScreen(navController: NavController, insets: PaddingValues) {
                             Spacer(modifier = Modifier.height(24.dp))
                             Text(
                                 text = when (state) {
-                                    is GuideUiState.PermissionGranted -> "${state.provider.name} Ready"
+                                    is GuideUiState.PermissionGranted -> "${
+                                        when (state.provider) {
+                                            PermissionProvider.SHIZUKU -> "Shizuku"
+                                            PermissionProvider.SHIZUKU_TERMINAL -> "Shizuku Terminal"
+                                            PermissionProvider.ROOT -> "Root"
+                                            PermissionProvider.TERMINAL -> "终端"
+                                        }
+                                    } 已就绪"
                                     is GuideUiState.NotificationPermissionGranted -> "通知权限已开启"
                                     else -> "一切就绪！"
                                 },
