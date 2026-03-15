@@ -13,6 +13,7 @@ import com.rosan.ruto.device.DeviceManager
 import com.rosan.ruto.ruto.DefaultRutoRuntime
 import com.rosan.ruto.ruto.GLMCommandParser
 import com.rosan.ruto.ruto.repo.RutoObserver
+import com.rosan.ruto.util.CrashLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -25,17 +26,19 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
+private const val TAG = "RutoAiTasker"
+private const val MAX_CONNECT_RETRIES = 3
+private const val CONNECT_RETRY_DELAY_MS = 2000L
+
 class RutoAiTasker(
-    private val context: Context, database: AppDatabase, private val deviceManager: DeviceManager
+    private val context: Context,
+    database: AppDatabase,
+    private val deviceManager: DeviceManager
 ) : RutoObserver {
     private val conversationDao = database.conversations()
-
     private val messageDao = database.messages()
-
     private val aisDao = database.ais()
-
     private val aiJobs = ConcurrentHashMap<Long, Job>()
-
     private var job: Job? = null
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -54,10 +57,25 @@ class RutoAiTasker(
                 }.collect { (displayId, conversation) ->
                     val convId = conversation.id
                     aiJobs[convId]?.cancelAndJoin()
-
                     aiJobs[convId] = scope.launch {
                         try {
+                            // 确保 Shizuku 已连接，失败则记录日志
+                            if (!ensureServiceConnected()) {
+                                val msg = "Shizuku 服务连接失败，任务 convId=$convId 已跳过"
+                                Log.e(TAG, msg)
+                                CrashLogger.logTaskError(context, TAG, msg)
+                                conversationDao.updateStatus(convId, ConversationStatus.ERROR)
+                                return@launch
+                            }
                             processAiRequest(displayId, conversation)
+                        } catch (e: Exception) {
+                            CrashLogger.logTaskError(
+                                context, TAG,
+                                "任务执行异常 convId=$convId displayId=$displayId", e
+                            )
+                            runCatching {
+                                conversationDao.updateStatus(convId, ConversationStatus.ERROR)
+                            }
                         } finally {
                             if (aiJobs[convId] == coroutineContext[Job]) aiJobs.remove(convId)
                         }
@@ -71,9 +89,20 @@ class RutoAiTasker(
         job = null
     }
 
-    private suspend fun processAiRequest(
-        displayId: Int, conversation: ConversationModel
-    ) {
+    private suspend fun ensureServiceConnected(): Boolean {
+        repeat(MAX_CONNECT_RETRIES) { attempt ->
+            runCatching {
+                deviceManager.serviceManager.ensureConnected()
+                return true
+            }.onFailure { e ->
+                Log.w(TAG, "Shizuku 连接尝试 ${attempt + 1}/$MAX_CONNECT_RETRIES 失败: ${e.message}")
+                if (attempt < MAX_CONNECT_RETRIES - 1) delay(CONNECT_RETRY_DELAY_MS)
+            }
+        }
+        return false
+    }
+
+    private suspend fun processAiRequest(displayId: Int, conversation: ConversationModel) {
         val messages = messageDao.all(conversation.id)
         val lastMessage = messages.lastOrNull()
         if (lastMessage == null) processAiFirstRequest(conversation)
@@ -87,29 +116,14 @@ class RutoAiTasker(
         }
     }
 
-    private suspend fun processAiFirstRequest(
-        conversation: ConversationModel
-    ) {
+    private suspend fun processAiFirstRequest(conversation: ConversationModel) {
         if (!conversation.isGLMPhone) return
-        val system =
-            context.assets.open("prompts/glm_phone.txt").bufferedReader().use { it.readText() }
-        messageDao.add(
-            MessageModel(
-                conversationId = conversation.id, source = MessageSource.SYSTEM, content = system
-            )
-        )
-        messageDao.add(
-            MessageModel(
-                conversationId = conversation.id,
-                source = MessageSource.USER,
-                content = conversation.name
-            )
-        )
+        val system = context.assets.open("prompts/glm_phone.txt").bufferedReader().use { it.readText() }
+        messageDao.add(MessageModel(conversationId = conversation.id, source = MessageSource.SYSTEM, content = system))
+        messageDao.add(MessageModel(conversationId = conversation.id, source = MessageSource.USER, content = conversation.name))
     }
 
-    private suspend fun processAiCaptureRequest(
-        displayId: Int, conversation: ConversationModel
-    ) {
+    private suspend fun processAiCaptureRequest(displayId: Int, conversation: ConversationModel) {
         try {
             val bitmap = deviceManager.getDisplayManager().capture(displayId).bitmap
             try {
@@ -119,7 +133,7 @@ class RutoAiTasker(
             }
             conversationDao.updateStatus(conversation.id, ConversationStatus.WAITING)
         } catch (e: Exception) {
-            e.printStackTrace()
+            CrashLogger.logTaskError(context, TAG, "截图失败 displayId=$displayId convId=${conversation.id}", e)
             conversationDao.updateStatus(conversation.id, ConversationStatus.ERROR)
         }
     }
@@ -144,8 +158,8 @@ class RutoAiTasker(
             delay(1000)
             processAiCaptureRequest(displayId, conversation)
         } catch (e: Exception) {
-            e.printStackTrace()
-            messageDao.addText(conversation.id, "错误，返回未按照要求格式。")
+            CrashLogger.logTaskError(context, TAG, "执行指令失败 displayId=$displayId convId=${conversation.id}", e)
+            messageDao.addText(conversation.id, "错误，执行指令失败：${e.message}")
             conversationDao.updateStatus(conversation.id, ConversationStatus.WAITING)
         }
     }

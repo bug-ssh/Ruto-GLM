@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
@@ -76,6 +77,10 @@ fun HomeScreen(navController: NavController, insets: WindowInsets) {
 
             MenuCard("对话列表", "查看 AI 对话历史", Icons.Default.Chat) {
                 navController.navigate(Destinations.CONVERSATION_LIST)
+            }
+
+            MenuCard("崩溃日志", "查看任务模式错误记录", Icons.Default.BugReport) {
+                navController.navigate(Destinations.CRASH_LOG)
             }
 
             Spacer(modifier = Modifier.height(16.dp))

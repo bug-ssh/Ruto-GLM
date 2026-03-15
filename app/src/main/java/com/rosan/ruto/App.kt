@@ -1,10 +1,9 @@
 package com.rosan.ruto
 
 import android.app.Application
-import android.app.Service
-import android.os.ServiceManager
 import com.rosan.ruto.di.init.appModules
 import com.rosan.ruto.service.KeepAliveService
+import com.rosan.ruto.util.CrashLogger
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -14,12 +13,13 @@ import rikka.sui.Sui
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
+
+        // 最优先安装全局崩溃日志捕获
+        CrashLogger.install(this)
+
         startKoin {
-            // Koin Android Logger
             androidLogger()
-            // Koin Android Context
             androidContext(this@App)
-            // use modules
             modules(appModules)
         }
         Sui.init(packageName)

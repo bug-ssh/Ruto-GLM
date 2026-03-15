@@ -19,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.rosan.ruto.ui.compose.CrashLogScreen
 import com.rosan.ruto.ui.compose.ConversationListScreen
 import com.rosan.ruto.ui.compose.ConversationScreen
 import com.rosan.ruto.ui.compose.GuideScreen
@@ -55,6 +56,9 @@ fun NavGraph() {
         }
         composable(Destinations.LLM_MODEL_LIST) {
             LlmModelListScreen(navController, insets)
+        }
+        composable(Destinations.CRASH_LOG) {
+            CrashLogScreen(navController, insets)
         }
         composable(
             route = "${Destinations.CONVERSATION}/{conversationId}",

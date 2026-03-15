@@ -9,4 +9,5 @@ object Destinations {
     const val CONVERSATION_LIST = "conversation_list"
     const val CONVERSATION = "conversation"
     const val LLM_MODEL_LIST = "llm_model_list"
+    const val CRASH_LOG = "crash_log"
 }
