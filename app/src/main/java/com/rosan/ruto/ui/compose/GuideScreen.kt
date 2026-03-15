@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.rosan.installer.ext.util.process.ProcessUtil
+import kotlinx.coroutines.launch
 import com.rosan.ruto.device.DeviceManager
 import com.rosan.ruto.service.KeepAliveService
 import com.rosan.ruto.ui.Destinations

@@ -43,6 +43,9 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Fix app/build.gradle.kts
+        run: cp app/build.grade.kts app/build.gradle.kts
+
       - name: Setup signing keystore
         env:
           SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
@@ -51,15 +54,17 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           mkdir -p keystore
-          if [ -n "${SIGNING_KEYSTORE}" ]; then
-            echo "${SIGNING_KEYSTORE}" | base64 --decode > keystore/release.jks
-            cat > keystore/release.properties << EOF
+          if [ -n "$SIGNING_KEYSTORE" ]; then
+            echo "使用正式签名 keystore"
+            echo "$SIGNING_KEYSTORE" | base64 --decode > keystore/release.jks
+            cat > keystore/r0s.properties << PROPS
 storeFile=release.jks
-storePassword=${SIGNING_STORE_PASSWORD}
-keyAlias=${SIGNING_KEY_ALIAS}
-keyPassword=${SIGNING_KEY_PASSWORD}
-EOF
+storePassword=$SIGNING_STORE_PASSWORD
+keyAlias=$SIGNING_KEY_ALIAS
+keyPassword=$SIGNING_KEY_PASSWORD
+PROPS
           else
+            echo "未配置签名 Secret，生成临时 keystore"
             keytool -genkeypair -v \
               -keystore keystore/release.jks \
               -alias release \
@@ -68,16 +73,12 @@ EOF
               -storepass android123 \
               -keypass android123 \
               -dname "CN=Ruto, O=Ruto, C=CN"
-            cat > keystore/release.properties << EOF
+            cat > keystore/r0s.properties << PROPS
 storeFile=release.jks
 storePassword=android123
 keyAlias=release
 keyPassword=android123
-EOF
-          fi
-          if [ -f "keystore/release.jks" ]; then
-            cp keystore/release.jks app/ 2>/dev/null || :
-            cp keystore/release.properties app/ 2>/dev/null || :
+PROPS
           fi
 
       - name: Build Release APK
@@ -86,15 +87,12 @@ EOF
       - name: Rename APK
         run: |
           mkdir -p dist
-          VERSION=""
-          if [ -f "app/build.gradle.kts" ]; then
-            VERSION=$(grep 'versionName' app/build.gradle.kts | head -1 | sed -n 's/.*"\(.*\)".*/\1/p')
-          fi
+          VERSION=$(grep 'versionName' app/build.grade.kts | head -1 | sed -n 's/.*"\(.*\)".*/\1/p')
           TAG="${{ github.ref_name }}"
           LABEL="${TAG:-v${VERSION:-unknown}}"
           APK_FILE=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
           if [ -z "$APK_FILE" ]; then
-            echo "Error: APK file not found"
+            echo "Error: APK not found"
             exit 1
           fi
           cp "$APK_FILE" "dist/Ruto-${LABEL}-release.apk"

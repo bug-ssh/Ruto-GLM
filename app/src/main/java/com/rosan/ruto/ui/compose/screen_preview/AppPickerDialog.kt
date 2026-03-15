@@ -75,6 +75,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 enum class AppSortBy(val label: String) {
@@ -99,7 +100,7 @@ fun AppPickerDialog(
     val focusRequester = remember { FocusRequester() }
 
     val apps by produceState<List<ApplicationInfo>?>(initialValue = null) {
-        value = withContext(kotlinx.coroutines.Dispatchers.IO) {
+        value = withContext(Dispatchers.IO) {
             val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
             }

@@ -1,5 +1,6 @@
 package com.rosan.ruto.ui.compose
 
+import android.view.DisplayInfo
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -67,6 +68,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.rosan.ruto.data.model.AiModel
 import com.rosan.ruto.data.model.ConversationModel
+import com.rosan.ruto.device.DeviceManager
 import com.rosan.ruto.ui.Destinations
 import com.rosan.ruto.ui.viewmodel.ConversationListViewModel
 import org.koin.androidx.compose.koinViewModel
@@ -245,9 +248,9 @@ private fun CreateConversationDialog(
     var isTaskConversation by remember { mutableStateOf(false) }
     var selectedDisplayId by remember { mutableStateOf<Int?>(null) }
 
-    val device = koinInject<com.rosan.ruto.device.DeviceManager>()
-    var displays by remember { mutableStateOf(emptyList<android.view.DisplayInfo>()) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    val device = koinInject<DeviceManager>()
+    var displays by remember { mutableStateOf(emptyList<DisplayInfo>()) }
+    LaunchedEffect(Unit) {
         displays = device.getDisplayManager().displays
     }
 
