@@ -46,8 +46,7 @@ jobs:
       - name: Fix app/build.gradle.kts
         run: cp app/build.grade.kts app/build.gradle.kts
 
-      - name: Setup signing keystore (with Secret)
-        if: ${{ secrets.SIGNING_KEYSTORE != '' }}
+      - name: Setup signing keystore
         env:
           SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
@@ -55,25 +54,23 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           mkdir -p keystore
-          echo "${SIGNING_KEYSTORE}" | base64 --decode > keystore/release.jks
-          printf "storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
-            "${SIGNING_STORE_PASSWORD}" "${SIGNING_KEY_ALIAS}" "${SIGNING_KEY_PASSWORD}" \
-            > keystore/r0s.properties
-
-      - name: Setup signing keystore (auto-generate)
-        if: ${{ secrets.SIGNING_KEYSTORE == '' }}
-        run: |
-          mkdir -p keystore
-          keytool -genkeypair -v \
-            -keystore keystore/release.jks \
-            -alias release \
-            -keyalg RSA -keysize 2048 \
-            -validity 3650 \
-            -storepass android123 \
-            -keypass android123 \
-            -dname "CN=Ruto, O=Ruto, C=CN"
-          printf "storeFile=release.jks\nstorePassword=android123\nkeyAlias=release\nkeyPassword=android123\n" \
-            > keystore/r0s.properties
+          if [ -n "$SIGNING_KEYSTORE" ]; then
+            echo "$SIGNING_KEYSTORE" | base64 --decode > keystore/release.jks
+            printf "storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
+              "$SIGNING_STORE_PASSWORD" "$SIGNING_KEY_ALIAS" "$SIGNING_KEY_PASSWORD" \
+              > keystore/r0s.properties
+          else
+            keytool -genkeypair -v \
+              -keystore keystore/release.jks \
+              -alias release \
+              -keyalg RSA -keysize 2048 \
+              -validity 3650 \
+              -storepass android123 \
+              -keypass android123 \
+              -dname "CN=Ruto, O=Ruto, C=CN"
+            printf "storeFile=release.jks\nstorePassword=android123\nkeyAlias=release\nkeyPassword=android123\n" \
+              > keystore/r0s.properties
+          fi
 
       - name: Build Release APK
         run: ./gradlew assembleRelease --stacktrace
