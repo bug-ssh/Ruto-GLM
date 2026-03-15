@@ -16,7 +16,7 @@ import com.rosan.ruto.service.PackageManagerService
 import kotlinx.coroutines.runBlocking
 
 class ShizukuDeviceImpl(context: Context) : DeviceRepo {
-    private val shizuku = ShizukuServiceManager()
+    private val shizuku = ShizukuServiceManager(context)
 
     override val packageManager: IPackageManager by lazy {
         runBlocking {
