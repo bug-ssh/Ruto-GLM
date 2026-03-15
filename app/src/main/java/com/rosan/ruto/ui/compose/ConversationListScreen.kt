@@ -1,7 +1,5 @@
 package com.rosan.ruto.ui.compose
 
-import android.os.ServiceManager
-import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -82,18 +80,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.rosan.installer.ext.util.dumpToBytes
 import com.rosan.ruto.data.model.AiModel
 import com.rosan.ruto.data.model.ConversationModel
-import com.rosan.ruto.device.repo.DeviceRepo
 import com.rosan.ruto.ui.Destinations
 import com.rosan.ruto.ui.viewmodel.ConversationListViewModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
-import rikka.shizuku.ShizukuBinderWrapper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -253,9 +245,11 @@ private fun CreateConversationDialog(
     var isTaskConversation by remember { mutableStateOf(false) }
     var selectedDisplayId by remember { mutableStateOf<Int?>(null) }
 
-    val device = koinInject<DeviceRepo>()
-    val displayManager = device.displayManager
-    val displays = remember { displayManager.displays }
+    val device = koinInject<com.rosan.ruto.device.DeviceManager>()
+    var displays by remember { mutableStateOf(emptyList<android.view.DisplayInfo>()) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        displays = device.getDisplayManager().displays
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,

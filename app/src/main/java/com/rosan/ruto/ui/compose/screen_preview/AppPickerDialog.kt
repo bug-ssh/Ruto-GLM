@@ -77,15 +77,15 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.withContext
 
-enum class AppSortBy {
-    AppName, PackageName, InstallTime
+enum class AppSortBy(val label: String) {
+    AppName("应用名称"), PackageName("包名"), InstallTime("安装时间")
 }
 
 // 新增过滤枚举
 enum class AppFilter(val label: String) {
-    All("All"),
-    User("User Only"),
-    System("System Only")
+    All("全部"),
+    User("用户应用"),
+    System("系统应用")
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -180,7 +180,7 @@ fun AppPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text("取消") }
         }
     )
 }
@@ -203,9 +203,9 @@ private fun SearchBarHeader(
     ) { searching ->
         if (!searching) {
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                Text("Select App", style = MaterialTheme.typography.headlineSmall)
+                Text("选择应用", style = MaterialTheme.typography.headlineSmall)
                 IconButton(onClick = { onSearchToggle(true) }) {
-                    Icon(Icons.Default.Search, "Search")
+                    Icon(Icons.Default.Search, "搜索")
                 }
             }
         } else {
@@ -215,10 +215,10 @@ private fun SearchBarHeader(
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
-                placeholder = { Text("Search apps...") },
+                placeholder = { Text("搜索应用…") },
                 trailingIcon = {
                     IconButton(onClick = { onSearchToggle(false); onTextChange("") }) {
-                        Icon(Icons.Default.Close, "Close")
+                        Icon(Icons.Default.Close, "清除")
                     }
                 },
                 singleLine = true,
@@ -301,7 +301,7 @@ private fun EmptyState(isFiltered: Boolean) {
             modifier = Modifier.size(48.dp),
             tint = MaterialTheme.colorScheme.outline
         )
-        Text("No results found", color = MaterialTheme.colorScheme.outline)
+        Text("未找到相关应用", color = MaterialTheme.colorScheme.outline)
     }
 }
 
@@ -412,13 +412,13 @@ private fun SortControl(
                     contentDescription = null
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(text = "Sort: ${sortBy.name}", style = MaterialTheme.typography.labelLarge)
+                Text(text = "排序：${sortBy.label}", style = MaterialTheme.typography.labelLarge)
                 Icon(Icons.Default.ArrowDropDown, contentDescription = null)
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 AppSortBy.entries.forEach {
                     DropdownMenuItem(
-                        text = { Text(it.name) },
+                        text = { Text(it.label) },
                         onClick = {
                             onSortByChange(it)
                             expanded = false

@@ -64,7 +64,7 @@ class KeepAliveService : Service(), KoinComponent {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
-                "Keep Alive Service Channel",
+                "后台保活服务",
                 NotificationManager.IMPORTANCE_DEFAULT
             )
             val manager = getSystemService(NotificationManager::class.java)
@@ -83,8 +83,8 @@ class KeepAliveService : Service(), KoinComponent {
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Ruto Service")
-            .setContentText("Ruto is running to stay active.")
+            .setContentTitle("Ruto 服务")
+            .setContentText("Ruto 正在后台运行。")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .build()
     }

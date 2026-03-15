@@ -2,8 +2,8 @@ package com.rosan.ruto.data.model.ai_model
 
 import androidx.room.TypeConverter
 
-enum class AiCapability {
-    VISION
+enum class AiCapability(val displayName: String) {
+    VISION("图像识别")
 }
 
 class AiCapabilityConverter {

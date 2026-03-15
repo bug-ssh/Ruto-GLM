@@ -32,7 +32,7 @@ fun CreateDisplayDialog(
     val defaultWidth = defaultDisplay?.logicalWidth ?: 1080
     val defaultHeight = defaultDisplay?.logicalHeight ?: 1920
     val defaultDensity = defaultDisplay?.logicalDensityDpi ?: 420
-    var name by remember { mutableStateOf("Virtual Screen") }
+    var name by remember { mutableStateOf("虚拟屏幕") }
     var width by remember { mutableStateOf("$defaultWidth") }
     var height by remember { mutableStateOf("$defaultHeight") }
     var density by remember { mutableStateOf("$defaultDensity") }
@@ -47,7 +47,7 @@ fun CreateDisplayDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create New Display") },
+        title = { Text("新建虚拟屏幕") },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -56,7 +56,7 @@ fun CreateDisplayDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Display Name") },
+                    label = { Text("屏幕名称") },
                     isError = nameError,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -64,7 +64,7 @@ fun CreateDisplayDialog(
                 OutlinedTextField(
                     value = width,
                     onValueChange = { if (it.all { c -> c.isDigit() }) width = it },
-                    label = { Text("Width (px)") },
+                    label = { Text("宽度 (px)") },
                     isError = widthInt <= 0,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -72,7 +72,7 @@ fun CreateDisplayDialog(
                 OutlinedTextField(
                     value = height,
                     onValueChange = { if (it.all { c -> c.isDigit() }) height = it },
-                    label = { Text("Height (px)") },
+                    label = { Text("高度 (px)") },
                     isError = heightInt <= 0,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -80,7 +80,7 @@ fun CreateDisplayDialog(
                 OutlinedTextField(
                     value = density,
                     onValueChange = { if (it.all { c -> c.isDigit() }) density = it },
-                    label = { Text("Density (DPI)") },
+                    label = { Text("像素密度 (DPI)") },
                     isError = densityInt <= 0,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -92,12 +92,12 @@ fun CreateDisplayDialog(
                 onClick = { onConfirm(name, widthInt, heightInt, densityInt) },
                 enabled = isFormValid
             ) {
-                Text("Create")
+                Text("创建")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("取消")
             }
         }
     )

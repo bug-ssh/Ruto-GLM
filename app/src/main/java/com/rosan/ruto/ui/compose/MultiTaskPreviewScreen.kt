@@ -167,7 +167,7 @@ fun MultiTaskPreviewScreen(navController: NavController, displayIds: List<Int>) 
                     "返回" -> activeDisplayId?.let { viewModel.clickBack(it) }
                     "选择应用" -> if (activeDisplayId != null) showAppPickerDialog = true
                     "切换模式" -> isDragMode = !isDragMode
-                    "Close" -> navController.popBackStack()
+                    "关闭" -> navController.popBackStack()
                 }
             },
             onButtonLongClick = {},

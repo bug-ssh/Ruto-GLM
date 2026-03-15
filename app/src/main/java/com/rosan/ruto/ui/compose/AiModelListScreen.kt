@@ -127,7 +127,7 @@ fun LlmModelListScreen(navController: NavController, insets: WindowInsets) {
                                 }.using(SizeTransform(clip = false))
                             }, label = "TextPushAnimation"
                         ) { targetSize ->
-                            Text(text = "$targetSize selected")
+                            Text(text = "已选 $targetSize 项")
                         }
                     }, navigationIcon = {
                         IconButton(onClick = { selectedIds = emptyList() }) {
@@ -188,7 +188,7 @@ fun LlmModelListScreen(navController: NavController, insets: WindowInsets) {
                     .padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No models added yet.", style = MaterialTheme.typography.bodyMedium)
+                Text("暂无模型，点击右下角添加吧！", style = MaterialTheme.typography.bodyMedium)
             }
         } else {
             LazyColumn(
@@ -297,7 +297,7 @@ private fun ModelItem(
                         color = typeColor.copy(alpha = 0.15f), shape = CircleShape
                     ) {
                         Text(
-                            text = model.type.name,
+                            text = model.type.displayName,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = typeColor,
@@ -312,7 +312,7 @@ private fun ModelItem(
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Text(
-                                text = cap.name,
+                                text = cap.displayName,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                 style = MaterialTheme.typography.labelSmall
                             )
@@ -473,7 +473,7 @@ private fun ModelEditorDialog(
                     onConfirm()
                 },
                 enabled = name.isNotBlank() && modelId.isNotBlank() && apiKey.isNotBlank()
-            ) { Text("Confirm") }
+            ) { Text("确认") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
 }

@@ -47,7 +47,7 @@ fun HomeScreen(navController: NavController, insets: WindowInsets) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ruto") }
+                title = { Text("主页") }
             )
         },
         contentWindowInsets = insets
@@ -61,12 +61,12 @@ fun HomeScreen(navController: NavController, insets: WindowInsets) {
         ) {
             // Shizuku 状态卡片
             StatusCard(
-                title = "Shizuku",
+                title = "Shizuku 状态",
                 subtitle = uiState.shizukuVersion,
                 isReady = uiState.isShizukuReady
             )
 
-            MenuCard("LLM Models", "Manage available models", Icons.Default.AutoAwesome) {
+            MenuCard("AI 模型", "管理可用的语言模型", Icons.Default.AutoAwesome) {
                 navController.navigate(Destinations.LLM_MODEL_LIST)
             }
 

@@ -2,9 +2,9 @@ package com.rosan.ruto.data.model.ai_model
 
 import androidx.room.TypeConverter
 
-enum class AiType {
-    OPENAI,
-    GEMINI
+enum class AiType(val displayName: String) {
+    OPENAI("OpenAI"),
+    GEMINI("Gemini")
 }
 
 class AiTypeConverter {

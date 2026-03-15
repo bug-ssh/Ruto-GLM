@@ -85,7 +85,7 @@ fun ScreenListScreen(navController: NavController, insets: WindowInsets) {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "返回"
                         )
                     }
                 },
@@ -94,7 +94,7 @@ fun ScreenListScreen(navController: NavController, insets: WindowInsets) {
                         IconButton(onClick = {
                             selectedDisplayIds = uiState.displays.map { it.displayId }.toSet()
                         }) {
-                            Icon(Icons.Default.SelectAll, contentDescription = "Select All")
+                            Icon(Icons.Default.SelectAll, contentDescription = "全选")
                         }
                     }
                 }

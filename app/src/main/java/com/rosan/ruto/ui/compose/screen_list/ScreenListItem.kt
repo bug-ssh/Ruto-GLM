@@ -115,7 +115,7 @@ fun ScreenListItem(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "Resolution: ${display.logicalWidth}x${display.logicalHeight} (${display.logicalDensityDpi} DPI)",
+                            "分辨率：${display.logicalWidth}x${display.logicalHeight}（${display.logicalDensityDpi} DPI）",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
@@ -136,7 +136,7 @@ fun ScreenListItem(
                                 contentColor = MaterialTheme.colorScheme.error
                             )
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete")
+                            Icon(Icons.Default.Delete, contentDescription = "删除")
                         }
                     }
 
@@ -146,7 +146,7 @@ fun ScreenListItem(
                             contentColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Icon(Icons.Default.Visibility, contentDescription = "Preview")
+                        Icon(Icons.Default.Visibility, contentDescription = "预览")
                     }
                 }
             }

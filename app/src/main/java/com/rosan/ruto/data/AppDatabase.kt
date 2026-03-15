@@ -17,7 +17,7 @@ import com.rosan.ruto.data.model.message.MessageTypeConverter
 
 @Database(
     entities = [ConversationModel::class, MessageModel::class, AiModel::class],
-    version = 7
+    version = 8
 )
 @TypeConverters(
     AiTypeConverter::class,
