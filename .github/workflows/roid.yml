@@ -1,8 +1,8 @@
-名字: Build & Release APK
+name: Build & Release APK
 
-于:
+on:
   push:
-    标签:
+    tags:
       - 'v*'
   workflow_dispatch:
 
@@ -11,29 +11,25 @@ env:
 
 jobs:
   build:
-    名字: Build Release APK
+    name: Build Release APK
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. 检出代码 ────────────────────────────────────────────────
-      - 名字: Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── 2. 设置 JDK 21 ────────────────────────────────────────────
-      - 名字: Set up JDK 21
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      # ── 3. 安装 Android SDK 36 ────────────────────────────────────
-      - 名字: Install Android SDK 36
+      - name: Install Android SDK 36
         run: |
           echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
             "platforms;android-36" \
             "build-tools;36.0.0"
 
-      # ── 4. 缓存 Gradle 依赖 ────────────────────────────────────────
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -44,25 +40,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # ── 5. 赋予 gradlew 执行权限 ───────────────────────────────────
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # ── 6. 检查 build.gradle.kts 文件 ──────────────────────────────
-      - name: Check and fix build.gradle.kts
-        run: |
-          # 检查原始文件是否存在
-          if [ -f "app/build.gradle.kts" ]; then
-            echo "app/build.gradle.kts 已存在"
-          elif [ -f "app/build.grade.kts" ]; then
-            echo "发现拼写错误文件，正在修复..."
-            cp app/build.grade.kts app/build.gradle.kts
-          else
-            echo "警告: 找不到 build.gradle.kts 文件"
-            ls -la app/
-          fi
-
-      # ── 7. 配置签名 Keystore ──────────────────────────────────────
       - name: Setup signing keystore
         env:
           SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
@@ -72,7 +52,6 @@ jobs:
         run: |
           mkdir -p keystore
           if [ -n "${SIGNING_KEYSTORE}" ]; then
-            echo "使用仓库 Secret 中的正式签名 keystore"
             echo "${SIGNING_KEYSTORE}" | base64 --decode > keystore/release.jks
             cat > keystore/release.properties << EOF
 storeFile=release.jks
@@ -81,7 +60,6 @@ keyAlias=${SIGNING_KEY_ALIAS}
 keyPassword=${SIGNING_KEY_PASSWORD}
 EOF
           else
-            echo "未配置 Secrets，自动生成临时 keystore"
             keytool -genkeypair -v \
               -keystore keystore/release.jks \
               -alias release \
@@ -97,53 +75,32 @@ keyAlias=release
 keyPassword=android123
 EOF
           fi
-          
-          # 将签名配置传递给 Gradle
-          echo "keystore.properties 文件已创建"
-          
-          # 可选：将签名文件复制到 app 模块
-          cp keystore/release.jks app/ 2>/dev/null || :
-
-      # ── 8. 配置项目使用签名文件 ───────────────────────────────────
-      - name: Configure signing for Gradle
-        run: |
-          # 在 app 模块创建 keystore.properties 引用
-          if [ -f "keystore/release.properties" ]; then
+          if [ -f "keystore/release.jks" ]; then
+            cp keystore/release.jks app/ 2>/dev/null || :
             cp keystore/release.properties app/ 2>/dev/null || :
           fi
 
-      # ── 9. 构建 Release APK ───────────────────────────────────────
       - name: Build Release APK
         run: ./gradlew assembleRelease --stacktrace
 
-      # ── 10. 重命名 APK ─────────────────────────────────────────────
       - name: Rename APK
         run: |
           mkdir -p dist
-          # 尝试从不同的文件读取 versionName
           VERSION=""
           if [ -f "app/build.gradle.kts" ]; then
             VERSION=$(grep 'versionName' app/build.gradle.kts | head -1 | sed -n 's/.*"\(.*\)".*/\1/p')
-          elif [ -f "app/build.grade.kts" ]; then
-            VERSION=$(grep 'versionName' app/build.grade.kts | head -1 | sed -n 's/.*"\(.*\)".*/\1/p')
           fi
-          
           TAG="${{ github.ref_name }}"
           LABEL="${TAG:-v${VERSION:-unknown}}"
-          
-          # 查找生成的 APK
           APK_FILE=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
           if [ -z "$APK_FILE" ]; then
-            echo "错误: 找不到生成的 APK 文件"
+            echo "Error: APK file not found"
             exit 1
           fi
-          
           cp "$APK_FILE" "dist/Ruto-${LABEL}-release.apk"
           echo "APK_PATH=dist/Ruto-${LABEL}-release.apk" >> $GITHUB_ENV
           echo "APK_NAME=Ruto-${LABEL}-release" >> $GITHUB_ENV
-          echo "APK 重命名为: Ruto-${LABEL}-release.apk"
 
-      # ── 11. 上传为 Artifact ───────────────────────────────────────
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -151,7 +108,6 @@ EOF
           path: ${{ env.APK_PATH }}
           retention-days: 30
 
-      # ── 12. 推送 tag 时，自动发布到 GitHub Releases ───────────────
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
