@@ -42,18 +42,18 @@ jobs:
             ${{ runner.os }}-gradle-
 
       # ── 5. 赋予 gradlew 执行权限 ───────────────────────────────────
-      - name: Grant execute permission for gradlew
+      - 名字: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       # ── 6. 修复 app/build.gradle.kts（原文件内容有误）────────────
-      - name: Fix app/build.gradle.kts
+      - 名字: Fix app/build.gradle.kts
         run: cp app/build.grade.kts app/build.gradle.kts
 
       # ── 7. 生成临时 debug keystore ────────────────────────────────
       #    build.gradle.kts 的 signingConfigs 在配置阶段就会读取
       #    keystore 属性，即使是 debug 构建也不例外，读不到就 NPE。
       #    这里生成一个临时 keystore + 配置文件来满足它的要求。
-      - name: Generate temporary debug keystore
+      - 名字: Generate temporary debug keystore
         run: |
           mkdir -p keystore
           keytool -genkeypair -v \
@@ -72,24 +72,24 @@ jobs:
           EOF
 
       # ── 8. 构建 Debug APK ─────────────────────────────────────────
-      - name: Build Debug APK
+      - 名字: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
 
       # ── 9. 上传为 Artifact ─────────────────────────────────────────
-      - name: Upload APK Artifact
+      - 名字: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ruto-debug-${{ github.sha }}
+          名字: ruto-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 7
 
       # ── 10. 推送 tag 时，自动发布到 GitHub Releases ────────────────
-      - name: Create GitHub Release
+      - 名字: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/debug/*.apk
+          文件: app/build/outputs/apk/debug/*.apk
           generate_release_notes: true
-          name: "Ruto ${{ github.ref_name }}"
+          名字: "Ruto ${{ github.ref_name }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
