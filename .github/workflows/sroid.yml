@@ -1,33 +1,40 @@
-name: Build & Release APK
+名字: Build & Release APK
 
-on:
+于:
   push:
-    tags:
+    标签:
       - 'v*'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
-    name: Build Debug APK
+    名字: Build Debug APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      # ── 1. 检出代码 ────────────────────────────────────────────────
+      - 名字: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      # ── 2. 设置 JDK 21 ────────────────────────────────────────────
+      - 名字: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Install Android SDK 36
+      # ── 3. 安装 Android SDK 36 ────────────────────────────────────
+      - 名字: Install Android SDK 36
         run: |
           echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
             "platforms;android-36" \
             "build-tools;36.0.0"
 
-      - name: Cache Gradle
+      # ── 4. 缓存 Gradle 依赖 ────────────────────────────────────────
+      - 名字: Cache Gradle
         uses: actions/cache@v4
         with:
           path: |
@@ -37,13 +44,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Grant execute permission for gradlew
+      # ── 5. 赋予 gradlew 执行权限 ───────────────────────────────────
+      - 名字: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Fix app/build.gradle.kts
+      # ── 6. 修复 app/build.gradle.kts（原文件名有拼写错误）────────────
+      - 名字: Fix app/build.gradle.kts
         run: cp app/build.grade.kts app/build.gradle.kts
 
-      - name: Generate temporary debug keystore
+      # ── 7. 生成临时 debug keystore ────────────────────────────────
+      - 名字: Generate temporary debug keystore
         run: |
           mkdir -p keystore
           keytool -genkeypair -v \
@@ -54,29 +64,32 @@ jobs:
             -storepass android123 \
             -keypass android123 \
             -dname "CN=Debug, O=Debug, C=US"
-          cat > keystore/debug.properties <<EOF
+          cat > keystore/debug.properties <<PROPS
           storeFile=debug.jks
           storePassword=android123
           keyAlias=debug
           keyPassword=android123
-          EOF
+          PROPS
 
-      - name: Build Debug APK
+      # ── 8. 构建 Debug APK ─────────────────────────────────────────
+      - 名字: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Upload APK Artifact
+      # ── 9. 上传为 Artifact ─────────────────────────────────────────
+      - 名字: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ruto-debug-${{ github.sha }}
+          名字: ruto-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 7
 
-      - name: Create GitHub Release
+      # ── 10. 推送 tag 时，自动发布到 GitHub Releases ────────────────
+      - 名字: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/debug/*.apk
           generate_release_notes: true
-          name: "Ruto ${{ github.ref_name }}"
+          名字: "Ruto ${{ github.ref_name }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
