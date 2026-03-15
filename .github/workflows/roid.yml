@@ -1,6 +1,6 @@
 name: Build & Release APK
 
-"on":
+on:
   push:
     tags:
       - 'v*'
@@ -48,13 +48,21 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # ── 6. 修复 app/build.gradle.kts（原文件名有拼写错误）────────────
-      - name: Fix app/build.gradle.kts
-        run: cp app/build.grade.kts app/build.gradle.kts
+      # ── 6. 检查 build.gradle.kts 文件 ──────────────────────────────
+      - name: Check and fix build.gradle.kts
+        run: |
+          # 检查原始文件是否存在
+          if [ -f "app/build.gradle.kts" ]; then
+            echo "app/build.gradle.kts 已存在"
+          elif [ -f "app/build.grade.kts" ]; then
+            echo "发现拼写错误文件，正在修复..."
+            cp app/build.grade.kts app/build.gradle.kts
+          else
+            echo "警告: 找不到 build.gradle.kts 文件"
+            ls -la app/
+          fi
 
       # ── 7. 配置签名 Keystore ──────────────────────────────────────
-      #    有 SIGNING_KEYSTORE Secret → 使用正式签名
-      #    无 Secret → 自动生成临时 keystore（可直接安装，但每次签名不同）
       - name: Setup signing keystore
         env:
           SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
@@ -66,9 +74,12 @@ jobs:
           if [ -n "${SIGNING_KEYSTORE}" ]; then
             echo "使用仓库 Secret 中的正式签名 keystore"
             echo "${SIGNING_KEYSTORE}" | base64 --decode > keystore/release.jks
-            printf "storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
-              "${SIGNING_STORE_PASSWORD}" "${SIGNING_KEY_ALIAS}" "${SIGNING_KEY_PASSWORD}" \
-              > keystore/r0s.properties
+            cat > keystore/release.properties << EOF
+storeFile=release.jks
+storePassword=${SIGNING_STORE_PASSWORD}
+keyAlias=${SIGNING_KEY_ALIAS}
+keyPassword=${SIGNING_KEY_PASSWORD}
+EOF
           else
             echo "未配置 Secrets，自动生成临时 keystore"
             keytool -genkeypair -v \
@@ -79,26 +90,60 @@ jobs:
               -storepass android123 \
               -keypass android123 \
               -dname "CN=Ruto, O=Ruto, C=CN"
-            printf "storeFile=release.jks\nstorePassword=android123\nkeyAlias=release\nkeyPassword=android123\n" \
-              > keystore/r0s.properties
+            cat > keystore/release.properties << EOF
+storeFile=release.jks
+storePassword=android123
+keyAlias=release
+keyPassword=android123
+EOF
+          fi
+          
+          # 将签名配置传递给 Gradle
+          echo "keystore.properties 文件已创建"
+          
+          # 可选：将签名文件复制到 app 模块
+          cp keystore/release.jks app/ 2>/dev/null || :
+
+      # ── 8. 配置项目使用签名文件 ───────────────────────────────────
+      - name: Configure signing for Gradle
+        run: |
+          # 在 app 模块创建 keystore.properties 引用
+          if [ -f "keystore/release.properties" ]; then
+            cp keystore/release.properties app/ 2>/dev/null || :
           fi
 
-      # ── 8. 构建 Release APK ───────────────────────────────────────
+      # ── 9. 构建 Release APK ───────────────────────────────────────
       - name: Build Release APK
         run: ./gradlew assembleRelease --stacktrace
 
-      # ── 9. 重命名 APK ─────────────────────────────────────────────
+      # ── 10. 重命名 APK ─────────────────────────────────────────────
       - name: Rename APK
         run: |
           mkdir -p dist
-          VERSION=$(grep 'versionName' app/build.grade.kts | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          # 尝试从不同的文件读取 versionName
+          VERSION=""
+          if [ -f "app/build.gradle.kts" ]; then
+            VERSION=$(grep 'versionName' app/build.gradle.kts | head -1 | sed -n 's/.*"\(.*\)".*/\1/p')
+          elif [ -f "app/build.grade.kts" ]; then
+            VERSION=$(grep 'versionName' app/build.grade.kts | head -1 | sed -n 's/.*"\(.*\)".*/\1/p')
+          fi
+          
           TAG="${{ github.ref_name }}"
-          LABEL="${TAG:-v${VERSION}}"
-          cp app/build/outputs/apk/release/*.apk "dist/Ruto-${LABEL}-release.apk"
+          LABEL="${TAG:-v${VERSION:-unknown}}"
+          
+          # 查找生成的 APK
+          APK_FILE=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
+          if [ -z "$APK_FILE" ]; then
+            echo "错误: 找不到生成的 APK 文件"
+            exit 1
+          fi
+          
+          cp "$APK_FILE" "dist/Ruto-${LABEL}-release.apk"
           echo "APK_PATH=dist/Ruto-${LABEL}-release.apk" >> $GITHUB_ENV
           echo "APK_NAME=Ruto-${LABEL}-release" >> $GITHUB_ENV
+          echo "APK 重命名为: Ruto-${LABEL}-release.apk"
 
-      # ── 10. 上传为 Artifact（每次构建均保留 30 天）───────────────
+      # ── 11. 上传为 Artifact ───────────────────────────────────────
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -106,7 +151,7 @@ jobs:
           path: ${{ env.APK_PATH }}
           retention-days: 30
 
-      # ── 11. 推送 tag 时，自动发布到 GitHub Releases ───────────────
+      # ── 12. 推送 tag 时，自动发布到 GitHub Releases ───────────────
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
