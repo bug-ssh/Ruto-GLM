@@ -84,13 +84,13 @@ jobs:
             echo "⚠️ No SIGNING_KEYSTORE found, using temporary keystore for Release build"
             keytool -genkeypair -v \
               -keystore keystore/r0s.jks \
-              -alias release \
+              -alias wudixiansheng \
               -keyalg RSA -keysize 2048 \
               -validity 3650 \
               -storepass android123 \
               -keypass android123 \
               -dname "CN=Ruto, O=Ruto, C=CN"
-            printf "storeFile=r0s.jks\nstorePassword=android123\nkeyAlias=release\nkeyPassword=android123\n" \
+            printf "storeFile=r0s.jks\nstorePassword=android123\nkeyAlias=wudixiansheng\nkeyPassword=android123\n" \
               > keystore/r0s.properties
           else
             # Debug 构建使用临时密钥
