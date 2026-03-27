@@ -102,12 +102,8 @@ jobs:
               -storepass android123 \
               -keypass android123 \
               -dname "CN=Debug, O=Debug, C=US"
-            cat > keystore/debug.properties <<PROPS
-            storeFile=debug.jks
-            storePassword=android123
-            keyAlias=debug
-            keyPassword=android123
-            PROPS
+            printf "storeFile=debug.jks\nstorePassword=android123\nkeyAlias=debug\nkeyPassword=android123\n" \
+              > keystore/debug.properties
           fi
 
       # ── 构建 APK ──────────────────────────────────────────────────────
