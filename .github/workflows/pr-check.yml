@@ -1,0 +1,271 @@
+# =============================================================================
+# PR 检查工作流 —— 确保每次 PR 都通过完整的质量门禁
+# =============================================================================
+name: PR Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_OPTS: >-
+    -Dorg.gradle.daemon=false
+    -Dorg.gradle.parallel=true
+    -Dorg.gradle.caching=true
+    -Dorg.gradle.jvmargs=-Xmx4g
+
+jobs:
+  # ─────────────────── 1. 代码质量检查 ──────────────────────────────────────
+  lint:
+    name: 📋 Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史用于比较
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Install Android SDK 36
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
+
+      - name: Gradle Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Fix app/build.gradle.kts
+        run: cp app/build.grade.kts app/build.gradle.kts
+
+      - name: Generate temporary debug keystore
+        run: |
+          mkdir -p keystore
+          keytool -genkeypair -v \
+            -keystore keystore/debug.jks \
+            -alias debug \
+            -keyalg RSA -keysize 2048 \
+            -validity 365 \
+            -storepass android123 \
+            -keypass android123 \
+            -dname "CN=Debug, O=Debug, C=US"
+          cat > keystore/debug.properties <<PROPS
+          storeFile=debug.jks
+          storePassword=android123
+          keyAlias=debug
+          keyPassword=android123
+          PROPS
+
+      - name: Run Android Lint
+        run: ./gradlew :app:lintDebug --stacktrace
+
+      - name: Upload Lint Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-lint-report
+          path: app/build/reports/lint-results-debug.html
+          retention-days: 7
+
+  # ─────────────────── 2. 单元测试 ──────────────────────────────────────────
+  test:
+    name: 🧪 Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Install Android SDK 36
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
+
+      - name: Gradle Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Fix app/build.gradle.kts
+        run: cp app/build.grade.kts app/build.gradle.kts
+
+      - name: Generate temporary debug keystore
+        run: |
+          mkdir -p keystore
+          keytool -genkeypair -v \
+            -keystore keystore/debug.jks \
+            -alias debug \
+            -keyalg RSA -keysize 2048 \
+            -validity 365 \
+            -storepass android123 \
+            -keypass android123 \
+            -dname "CN=Debug, O=Debug, C=US"
+          cat > keystore/debug.properties <<PROPS
+          storeFile=debug.jks
+          storePassword=android123
+          keyAlias=debug
+          keyPassword=android123
+          PROPS
+
+      - name: Run Unit Tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
+
+      - name: Upload Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-test-report
+          path: app/build/reports/tests/
+          retention-days: 7
+
+  # ─────────────────── 3. 构建验证 ──────────────────────────────────────────
+  build:
+    name: 🏗️ Build Verification
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Install Android SDK 36
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
+
+      - name: Gradle Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Fix app/build.gradle.kts
+        run: cp app/build.grade.kts app/build.gradle.kts
+
+      - name: Generate temporary debug keystore
+        run: |
+          mkdir -p keystore
+          keytool -genkeypair -v \
+            -keystore keystore/debug.jks \
+            -alias debug \
+            -keyalg RSA -keysize 2048 \
+            -validity 365 \
+            -storepass android123 \
+            -keypass android123 \
+            -dname "CN=Debug, O=Debug, C=US"
+          cat > keystore/debug.properties <<PROPS
+          storeFile=debug.jks
+          storePassword=android123
+          keyAlias=debug
+          keyPassword=android123
+          PROPS
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload PR APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+
+  # ─────────────────── 4. PR 摘要反馈 ──────────────────────────────────────
+  pr-summary:
+    name: 📝 PR Summary
+    runs-on: ubuntu-latest
+    needs: [lint, test, build]
+    if: always()
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Post PR Status Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const lintResult = '${{ needs.lint.result }}';
+            const testResult = '${{ needs.test.result }}';
+            const buildResult = '${{ needs.build.result }}';
+
+            const status = (r) => {
+              if (r === 'success') return '✅ 通过';
+              if (r === 'failure') return '❌ 失败';
+              if (r === 'cancelled') return '⏹️ 已取消';
+              return '⏳ 等待中';
+            };
+
+            const allPassed = lintResult === 'success' 
+              && testResult === 'success' 
+              && buildResult === 'success';
+
+            const body = [
+              "## PR 自动检查结果",
+              "",
+              "| 检查项 | 状态 |",
+              "|--------|------|",
+              "| Android Lint | " + status(lintResult) + " |",
+              "| 单元测试 | " + status(testResult) + " |",
+              "| 构建验证 | " + status(buildResult) + " |",
+              "",
+              allPassed
+                ? "**所有检查通过！此 PR 已准备好合并。**"
+                : "**部分检查未通过，请查看详细信息后再合并。**",
+              "",
+              "---",
+              "> 构建产物可在 Actions 页面下载（Debug APK）",
+            ].join("\n");
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
